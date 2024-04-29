@@ -1,7 +1,9 @@
 export class TreeNode {
   constructor(node) {
-    this.name = node.name;
+    this.id = node.name;
     this.description = node.description;
-    this.parent = typeof node.parent !== 'undefined' ? node.parent : null;
+    if(typeof node.parent !== 'undefined'){
+      this.parentId = node.parent
+    }
   }
 }
