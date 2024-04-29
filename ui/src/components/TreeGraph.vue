@@ -78,16 +78,21 @@
         .attr("paint-order", "stroke")
 
     node.on("click", function(event, data) {
-      selected_node_data.value = data.data
 
       if(selected_node !== null){
         selected_node.select("rect").style("fill", "white");
       }
-      selected_node = d3.select(event.currentTarget);
-      selected_node.select("rect").style("fill", "red");
 
-      console.log(data);
-      // console.log(d.target.getData())
+      //Toggle selection
+      if(selected_node_data.value !== {} && selected_node_data.value.id === data.data.id){
+        console.log("already selected")
+        selected_node=null
+        selected_node_data.value={}
+      }else{
+        selected_node = d3.select(event.currentTarget);
+        selected_node.select("rect").style("fill", "red");
+        selected_node_data.value = data.data
+      }
     })
   })
 </script>
@@ -95,7 +100,7 @@
 <template>
   <div>
     <h2>Tree graph</h2>
-    <NodeDescription  v-bind:selected_node_data="selected_node_data"></NodeDescription>
+    <NodeDescription  v-bind:selected_node_data="selected_node_data" ></NodeDescription>
     <svg></svg>
   </div>
 </template>
