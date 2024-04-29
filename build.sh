@@ -17,21 +17,23 @@ docker push $IMAGE_URI
 # deploy cloudformation
 function deploy_stack() {
   local CAPABILITIES="CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND CAPABILITY_IAM"
-  if ! aws cloudformation describe-stacks --stack-name $1 --output text; then
+  if ! aws cloudformation describe-stacks --stack-name $1 --output text --query "Stacks[0].StackId"; then
     echo "Creating stack $1"
     aws cloudformation create-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES
     echo "Waiting for stack to be created"
     aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack created!"
   else
     echo "Updating stack $1"
-    if aws cloudformation update-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES || [ $? -eq 254 ]; then
-      echo "CloudFormation stack update successful or no updates needed."
+    if aws cloudformation update-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES; then
+      echo "CloudFormation stack update successful"
+      echo "Waiting for stack to be updated"
+        aws cloudformation wait stack-update-complete --stack-name $1 && echo "Stack updated!"
+    elif [ $? -eq 254 ]; then
+      echo "No updates to be performed."
     else
       echo "CloudFormation stack update failed."
       return 1
     fi
-    echo "Waiting for stack to be updated"
-    aws cloudformation wait stack-update-complete --stack-name $1 && echo "Stack updated!"
   fi
   return 0
 }
@@ -43,5 +45,8 @@ deploy_stack $FRONTEND_STACK "cloudformation/frontend_stack.yaml" "ParameterKey=
 deploy_stack $BACKEND_STACK "cloudformation/backend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE ParameterKey=VPCStackName,ParameterValue=VPC-stack ParameterKey=BackendImage,ParameterValue=$IMAGE_URI"
 
 # build frontend
+cd ui
+npm run build
 S3_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`S3Name`].OutputValue' --output text)
-aws s3 sync ui s3://$S3_NAME
+aws s3 sync dist s3://$S3_NAME
+cd ..

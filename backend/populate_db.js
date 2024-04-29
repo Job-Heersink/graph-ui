@@ -2,7 +2,7 @@
 populate the AWS Neptune Database with the given json data.
  */
 
-import {g, execute_query} from "./neptune.js"
+import {g, execute_query, close_connection} from "./db/neptune.js"
 
 const data = {
     "data":[
@@ -47,21 +47,25 @@ const data = {
 let query = g
 async function add_data(){
     console.log("populating database")
+
+    // clear existing data
     await g.V().drop().iterate()
 
     // add vertices
     for(const d of data["data"]){
-        query = query.addV(d["name"]).property("description", d["description"])
+        query = query.addV(d.name).property("description", d.description).as(d.name)
     }
 
     //add edges
     for(const d of data["data"]){
-        query = query.V(d["parent"]).addE("CHILD").to(d["name"])
+        if (d.parent !== "") {
+            query = query.V().hasLabel(d.name).addE("PARENT").to(d.parent)
+        }
     }
     await query.next()
 }
 
 
-// execute_query(add_data).then(() => console.log("data has been written"))
-g.V().next().then((r)=>{console.log(r)})
-add_data().then(()=>console.log("database populated")).then(()=>g.V().next().then((r)=>console.log(r)))
+await execute_query(add_data)
+console.log("database populated")
+await close_connection()

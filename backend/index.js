@@ -1,10 +1,13 @@
 import express from "express"
-const app = express()
-const port = 5000
+import cors from "cors"
+import graph_router from "./routes/graph_route.js"
 
-app.get('/', (req, res) => {
-    res.send('Online')
-})
+const port = process.env.PORT || 5000;
+export const app = express()
+
+app.use(cors())
+app.use(express.json())
+app.use('/api/graph', graph_router);
 
 app.get('/ping', (req, res) => {
     res.send('pong')

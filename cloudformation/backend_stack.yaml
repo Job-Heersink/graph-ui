@@ -16,6 +16,10 @@ Parameters:
   BackendImage:
     Type: String
     Description: Docker image for the backend
+  BackendPort:
+    Type: Number
+    Default: 5000
+    Description: The port the backend listens on
 
 Description: 'This template deploys the cloud infrastructure for the graph-ui application'
 
@@ -35,29 +39,29 @@ Resources:
         - Name: containerInsights
           Value: enabled
 
-  BackendECSService:
-    Type: AWS::ECS::Service
-    DependsOn:
-      - BackendALBListener
-    Properties:
-      Cluster: !Ref BackendECSCluster
-      DesiredCount: 1
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref BackendSecurityGroup
-          Subnets:
-            - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetC"
-      ServiceName:
-        Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-service"
-      TaskDefinition: !GetAtt BackendECSTask.TaskDefinitionArn
-      LoadBalancers:
-        - ContainerName:
-            Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
-          ContainerPort: 5000
-          TargetGroupArn: !Ref BackendALBDefaultTargetGroup
+#  BackendECSService:
+#    Type: AWS::ECS::Service
+#    DependsOn:
+#      - BackendALBListener
+#    Properties:
+#      Cluster: !Ref BackendECSCluster
+#      DesiredCount: 1
+#      LaunchType: FARGATE
+#      NetworkConfiguration:
+#        AwsvpcConfiguration:
+#          AssignPublicIp: ENABLED
+#          SecurityGroups:
+#            - !Ref BackendSecurityGroup
+#          Subnets:
+#            - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetC"
+#      ServiceName:
+#        Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-service"
+#      TaskDefinition: !GetAtt BackendECSTask.TaskDefinitionArn
+#      LoadBalancers:
+#        - ContainerName:
+#            Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
+#          ContainerPort: !Ref BackendPort
+#          TargetGroupArn: !Ref BackendALBDefaultTargetGroup
 
   BackendECSTask:
     Type: AWS::ECS::TaskDefinition
@@ -73,12 +77,14 @@ Resources:
             Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
           PortMappings:
             - AppProtocol: http2
-              ContainerPort: 5000
+              ContainerPort: !Ref BackendPort
           Environment:
             - Name: NEPTUNE_ENDPOINT
               Value: !GetAtt NeptuneDBCluster.Endpoint
             - Name: NEPTUNE_PORT
               Value: !GetAtt NeptuneDBCluster.Port
+            - Name: PORT
+              Value: !Ref BackendPort
       Cpu: 256
       ExecutionRoleArn: !GetAtt ECSTaskExecutionIAMRole.Arn
       Family: "graph-ui"
@@ -109,7 +115,7 @@ Resources:
         Fn::Sub: "${AWS::Region}-${EnvironmentCode}-graph-ui-tg"
       VpcId:
         Fn::ImportValue: !Sub "${VPCStackName}-VPC"
-      Port: 5000
+      Port: !Ref BackendPort
       Protocol: HTTP #TODO: set to HTTPS, bu then also supply a certificate
       HealthCheckPath: "/ping"
       HealthCheckIntervalSeconds: 60
@@ -123,7 +129,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       LoadBalancerArn: !Ref BackendALB
-      Port: 5000
+      Port: !Ref BackendPort
       Protocol: HTTP #TODO: set to HTTPS, bu then also supply a certificate
       DefaultActions:
         - Type: forward
@@ -180,10 +186,10 @@ Resources:
         - IpProtocol: -1
           CidrIp: "0.0.0.0/0"
       SecurityGroupIngress:
-        - FromPort: "5000"
+        - FromPort: !Ref BackendPort
           IpProtocol: "tcp"
           SourceSecurityGroupId: !Ref ALBSecurityGroup
-          ToPort: "5000"
+          ToPort: !Ref BackendPort
       VpcId:
         Fn::ImportValue: !Sub "${VPCStackName}-VPC"
 
@@ -194,10 +200,10 @@ Resources:
       GroupName:
         Fn::Sub: "ec2-${AWS::Region}-${EnvironmentCode}-alb-sec-group"
       SecurityGroupIngress:
-        - FromPort: "5000"
+        - FromPort: !Ref BackendPort
           IpProtocol: "tcp"
           CidrIp: "0.0.0.0/0"
-          ToPort: "5000"
+          ToPort: !Ref BackendPort
       VpcId:
         Fn::ImportValue: !Sub "${VPCStackName}-VPC"
 
@@ -253,3 +259,22 @@ Resources:
       SubnetIds:
         - Fn::ImportValue: !Sub "${VPCStackName}-SubnetA"
         - Fn::ImportValue: !Sub "${VPCStackName}-SubnetB"
+
+Outputs:
+  NeptuneDBEndpoint:
+    Description: Reference to the NeptuneDB endpoint
+    Value: !GetAtt NeptuneDBCluster.Endpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-NeptuneDBEndpoint
+
+  NeptuneDBPort:
+    Description: Reference to the NeptuneDB port
+    Value: !GetAtt NeptuneDBCluster.Port
+    Export:
+      Name: !Sub ${AWS::StackName}-NeptuneDBPort
+
+  ALBEndpoint:
+    Description: Reference to the ALB dns name
+    Value: !GetAtt BackendALB.DNSName
+    Export:
+      Name: !Sub ${AWS::StackName}-ALBEndpoint
