@@ -19,26 +19,6 @@ const __ = gremlin.process.statics;
 let conn = null;
 export let g = null;
 
-// async function query(context) {
-//
-//     const id = context.id;
-//
-//     return g.V(id)
-//         .fold()
-//         .coalesce(
-//             __.unfold(),
-//             __.addV('User').property(t.id, id)
-//         )
-//         .id().next();
-// }
-//
-// async function doQuery() {
-//     const id = Math.floor(Math.random() * 10000).toString();
-//
-//     let result = await query({id: id});
-//     return result['value'];
-// }
-
 
 const createRemoteConnection = () => {
     const { url, headers } = getUrlAndHeaders(
@@ -102,6 +82,10 @@ export async function execute_query(query){
 
         },
         query);
+}
+
+export async function close_connection(){
+    return conn.close()
 }
 
 console.info("Initializing connection")
