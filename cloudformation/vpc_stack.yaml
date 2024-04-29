@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: 'This template deploys a simple VPC with public and private subnets'
+
+Resources:
+  # # # # # # # # # # # # #
+  # The VPC configuration #
+  # # # # # # # # # # # # #
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+
+  SubnetA: #private subnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: 'AWS::Region' #select the 1st availability zone in the region
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.0.0/24"
+
+  SubnetB: #private subnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs
+          Ref: 'AWS::Region' #select the 2nd availability zone in the region
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.1.0/24"
+
+  PublicSubnetC: #public subnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs
+          Ref: 'AWS::Region' #select the 2nd availability zone in the region
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.2.0/24"
+
+  PublicSubnetD: #public subnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: 'AWS::Region' #select the 2nd availability zone in the region
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.3.0/24"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref "VPC"
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref "VPC"
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+
+  VPCGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref "VPC"
+      InternetGatewayId: !Ref "InternetGateway"
+
+  InternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetCRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetC
+
+  PublicSubnetDRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetD
+
+  SubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref SubnetA
+
+  SubnetBRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref SubnetB
+
+Outputs:
+  VPC:
+    Description: Reference to the VPC
+    Value:
+      Ref: VPC
+    Export:
+      Name: !Sub ${AWS::StackName}-VPC
+
+  VPCDefaultSecurityGroup:
+    Description: Reference to the default security group of the VPC
+    Value:
+      Fn::GetAtt: [VPC, DefaultSecurityGroup]
+    Export:
+      Name: !Sub ${AWS::StackName}-VPCDefaultSecurityGroup
+
+  SubnetA:
+    Description: Reference to the private subnet A
+    Value:
+      Ref: SubnetA
+    Export:
+      Name: !Sub ${AWS::StackName}-SubnetA
+
+  SubnetB:
+    Description: Reference to the private subnet B
+    Value:
+      Ref: SubnetB
+    Export:
+      Name: !Sub ${AWS::StackName}-SubnetB
+
+  PublicSubnetC:
+    Description: Reference to the private subnet C
+    Value:
+      Ref: PublicSubnetC
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetC
+
+  PublicSubnetD:
+    Description: Reference to the private subnet D
+    Value:
+      Ref: PublicSubnetD
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetD

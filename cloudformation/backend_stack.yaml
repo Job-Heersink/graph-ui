@@ -1,0 +1,255 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  VPCStackName:
+    Type: String
+    Description: The name of the VPC stack
+  EnvironmentCode:
+    Type: String
+    Default: 'dev'
+    AllowedValues:
+      - dev
+      - stg
+      - prod
+      - sandbox
+    Description: The environment code used in the naming of all AWS services.
+  BackendImage:
+    Type: String
+    Description: Docker image for the backend
+
+Description: 'This template deploys the cloud infrastructure for the graph-ui application'
+
+Resources:
+  ###############
+  ##  backend  ##
+  ###############
+  BackendECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      ClusterName:
+        Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-cluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  BackendECSService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - BackendALBListener
+    Properties:
+      Cluster: !Ref BackendECSCluster
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref BackendSecurityGroup
+          Subnets:
+            - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetC"
+      ServiceName:
+        Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-service"
+      TaskDefinition: !GetAtt BackendECSTask.TaskDefinitionArn
+      LoadBalancers:
+        - ContainerName:
+            Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
+          ContainerPort: 5000
+          TargetGroupArn: !Ref BackendALBDefaultTargetGroup
+
+  BackendECSTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - DisableNetworking: false
+#          HealthCheck:
+#            Command: [ "CMD-SHELL", "curl -f http://localhost:5000/ping || exit 1" ] #TODO: fix
+          Image: !Ref BackendImage
+#          LogConfiguration:
+#            LogConfiguration
+          Name:
+            Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
+          PortMappings:
+            - AppProtocol: http2
+              ContainerPort: 5000
+          Environment:
+            - Name: NEPTUNE_ENDPOINT
+              Value: !GetAtt NeptuneDBCluster.Endpoint
+            - Name: NEPTUNE_PORT
+              Value: !GetAtt NeptuneDBCluster.Port
+      Cpu: 256
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionIAMRole.Arn
+      Family: "graph-ui"
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      TaskRoleArn: !GetAtt ECSTaskIAMRole.Arn
+
+  BackendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name:
+        Fn::Sub: "${AWS::Region}-${EnvironmentCode}-graph-ui-lb"
+      Subnets:
+        - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetC"
+        - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetD"
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+
+  BackendALBDefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name:
+        Fn::Sub: "${AWS::Region}-${EnvironmentCode}-graph-ui-tg"
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPC"
+      Port: 5000
+      Protocol: HTTP #TODO: set to HTTPS, bu then also supply a certificate
+      HealthCheckPath: "/ping"
+      HealthCheckIntervalSeconds: 60
+      HealthyThresholdCount: 2
+      TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+
+  BackendALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BackendALB
+      Port: 5000
+      Protocol: HTTP #TODO: set to HTTPS, bu then also supply a certificate
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendALBDefaultTargetGroup
+
+  ECSTaskExecutionIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:
+        Fn::Sub: "iam-${AWS::Region}-${EnvironmentCode}-graph-ui-ecs-task-execution-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+  ECSTaskIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:
+        Fn::Sub: "iam-${AWS::Region}-${EnvironmentCode}-graph-ui-ecs-task-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'root'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "neptune-db:*"
+                Resource: "*"
+
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for the graph-io"
+      GroupName:
+        Fn::Sub: "ec2-${AWS::Region}-${EnvironmentCode}-graph-ui-sec-group"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupIngress:
+        - FromPort: "5000"
+          IpProtocol: "tcp"
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          ToPort: "5000"
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPC"
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for the graph-io"
+      GroupName:
+        Fn::Sub: "ec2-${AWS::Region}-${EnvironmentCode}-alb-sec-group"
+      SecurityGroupIngress:
+        - FromPort: "5000"
+          IpProtocol: "tcp"
+          CidrIp: "0.0.0.0/0"
+          ToPort: "5000"
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPC"
+
+  ###############
+  ## database  ##
+  ###############
+
+  NeptuneDBCluster:
+    Type: AWS::Neptune::DBCluster
+    Properties:
+      DBClusterIdentifier:
+        Fn::Sub: "neptune-${AWS::Region}-${EnvironmentCode}-graph-ui-db-cluster"
+      DBSubnetGroupName: !Ref NeptuneDBSubnetGroup
+      DeletionProtection: false
+      EngineVersion: "1.3"
+      IamAuthEnabled: true
+#      KmsKeyId: String
+      StorageEncrypted: true
+      VpcSecurityGroupIds:
+        - !Ref NeptuneSecurityGroup
+
+  NeptuneDB:
+    Type: AWS::Neptune::DBInstance
+    Properties:
+      AllowMajorVersionUpgrade: true
+      AutoMinorVersionUpgrade: true
+      DBInstanceClass: "db.t3.medium"
+      DBInstanceIdentifier:
+        Fn::Sub: "neptune-${AWS::Region}-${EnvironmentCode}-graph-ui-db"
+      DBClusterIdentifier: !Ref NeptuneDBCluster
+#      DBSubnetGroupName: !Ref NeptuneDBSubnetGroup
+
+  NeptuneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for the neptune db"
+      GroupName:
+        Fn::Sub: "ec2-${AWS::Region}-${EnvironmentCode}-neptune-sec-group"
+      SecurityGroupIngress:
+        - FromPort: "8182"
+          IpProtocol: "tcp"
+          CidrIp: "0.0.0.0/0" #TODO: can be edited to only allow ecs
+          ToPort: "8182"
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPC"
+
+  NeptuneDBSubnetGroup:
+    Type: AWS::Neptune::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "private subnet group for graph-ui db"
+      DBSubnetGroupName:
+        Fn::Sub: "neptune-${AWS::Region}-${EnvironmentCode}-graph-ui-db-subnet-group"
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetA"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetB"
