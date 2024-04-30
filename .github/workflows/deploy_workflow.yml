@@ -57,59 +57,60 @@ jobs:
           echo "FRONTEND_STACK=$ENVIRONMENT_CODE-$PRODUCT_NAME-frontend-stack" >> $GITHUB_ENV
           echo "BACKEND_STACK=$ENVIRONMENT_CODE-$PRODUCT_NAME-backend-stack" >> $GITHUB_ENV
 
-      - name: Create docker image
-        env:
-          AWS_ECR_REPO: ${{ secrets.AWS_ECR_REPO }}
-        run: |
-          aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_ECR_REPO
-          docker build -t $PRODUCT_NAME backend
-          docker tag $PRODUCT_NAME:latest $IMAGE_URI
-          docker push $IMAGE_URI
-
-      - name: Deploy to cloudformation Production
-        env:
-          ENVIRONMENT_CODE: ${{ vars.ENV_CODE }}
-        run: |
-          function deploy_stack() {
-            local CAPABILITIES="CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND CAPABILITY_IAM"
-          
-            if ! aws cloudformation describe-stacks --stack-name $1 --output text --query "Stacks[0].StackId"; then
-              echo "Creating stack $1"
-              aws cloudformation create-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES
-              echo "Waiting for stack to be created"
-              aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack created!"
-            else
-              echo "Updating stack $1"
-              if aws cloudformation update-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES; then
-                echo "CloudFormation stack update successful"
-                echo "Waiting for stack to be updated"
-                aws cloudformation wait stack-update-complete --stack-name $1 && echo "Stack updated!"
-              elif [ $? -eq 254 ]; then
-                echo "No updates to be performed."
-              else
-                echo "CloudFormation stack update failed."
-              return 1
-              fi
-            fi
-          
-            return 0
-          }
-            
-
-          deploy_stack "VPC-stack" "cloudformation/vpc_stack.yaml"
-          deploy_stack $FRONTEND_STACK "cloudformation/frontend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE"
-          deploy_stack $BACKEND_STACK "cloudformation/backend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE ParameterKey=VPCStackName,ParameterValue=VPC-stack ParameterKey=BackendImage,ParameterValue=$IMAGE_URI"
-
-
-      - name: Deploy backend
-        run: |
-          CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`ECSClusterName`].OutputValue' --output text)
-          SERVICE_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`ECSServiceName`].OutputValue' --output text)
-          aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
+#      - name: Create docker image
+#        env:
+#          AWS_ECR_REPO: ${{ secrets.AWS_ECR_REPO }}
+#        run: |
+#          aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_ECR_REPO
+#          docker build -t $PRODUCT_NAME backend
+#          docker tag $PRODUCT_NAME:latest $IMAGE_URI
+#          docker push $IMAGE_URI
+#
+#      - name: Deploy to cloudformation Production
+#        env:
+#          ENVIRONMENT_CODE: ${{ vars.ENV_CODE }}
+#        run: |
+#          function deploy_stack() {
+#            local CAPABILITIES="CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND CAPABILITY_IAM"
+#
+#            if ! aws cloudformation describe-stacks --stack-name $1 --output text --query "Stacks[0].StackId"; then
+#              echo "Creating stack $1"
+#              aws cloudformation create-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES
+#              echo "Waiting for stack to be created"
+#              aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack created!"
+#            else
+#              echo "Updating stack $1"
+#              if aws cloudformation update-stack --stack-name $1 --template-body file://$2 --parameters $3 --capabilities $CAPABILITIES; then
+#                echo "CloudFormation stack update successful"
+#                echo "Waiting for stack to be updated"
+#                aws cloudformation wait stack-update-complete --stack-name $1 && echo "Stack updated!"
+#              elif [ $? -eq 254 ]; then
+#                echo "No updates to be performed."
+#              else
+#                echo "CloudFormation stack update failed."
+#              return 1
+#              fi
+#            fi
+#
+#            return 0
+#          }
+#
+#
+#          deploy_stack "VPC-stack" "cloudformation/vpc_stack.yaml"
+#          deploy_stack $FRONTEND_STACK "cloudformation/frontend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE"
+#          deploy_stack $BACKEND_STACK "cloudformation/backend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE ParameterKey=VPCStackName,ParameterValue=VPC-stack ParameterKey=BackendImage,ParameterValue=$IMAGE_URI"
+#
+#
+#      - name: Deploy backend
+#        run: |
+#          CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`ECSClusterName`].OutputValue' --output text)
+#          SERVICE_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`ECSServiceName`].OutputValue' --output text)
+#          aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
 
       - name: Deploy frontend
         run: |
           cd ui
+          npm install
           npm run build
           S3_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`S3Name`].OutputValue' --output text)
           aws s3 sync dist s3://$S3_NAME
