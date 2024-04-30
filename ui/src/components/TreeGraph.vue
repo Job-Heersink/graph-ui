@@ -90,9 +90,16 @@
         selected_node_data.value={}
       }else{
         selected_node = d3.select(event.currentTarget);
-        selected_node.select("rect").style("fill", "red");
+        selected_node.select("rect").style("fill", "green");
         selected_node_data.value = data.data
       }
+    })
+
+    node.on("mouseenter", function(event) {
+      d3.select(event.currentTarget).select("rect").attr("stroke", "green")
+    })
+    node.on("mouseleave", function(event) {
+      d3.select(event.currentTarget).select("rect").attr("stroke", d => d.children ? "#555" : "#999")
     })
   })
 </script>
