@@ -5,6 +5,10 @@ import gremlin from "gremlin";
 const  __  = gremlin.process.statics;
 
 export async function get_tree(req, res){
+    /*
+     retrieve the entire tree from the database
+     */
+
     const g = await get_traversal();
     let vertexes = await g.V().project('name', 'description', 'parent')
         .by(__.label())

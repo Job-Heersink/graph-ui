@@ -12,7 +12,7 @@ import gremlin from 'gremlin';
 const traversal = gremlin.process.AnonymousTraversalSource.traversal;
 const DriverRemoteConnection = gremlin.driver.DriverRemoteConnection;
 
-let conn = null;
+export let conn = null;
 
 
 async function createRemoteConnection() {

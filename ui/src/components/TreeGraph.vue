@@ -77,6 +77,7 @@
         .attr("stroke", "white")
         .attr("paint-order", "stroke")
 
+    // make node green on click
     node.on("click", function(event, data) {
 
       if(selected_node !== null){
@@ -95,6 +96,7 @@
       }
     })
 
+    // make the stroke of the node green on hover
     node.on("mouseenter", function(event) {
       d3.select(event.currentTarget).select("rect").attr("stroke", "green")
     })

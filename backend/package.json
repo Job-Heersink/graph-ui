@@ -10,6 +10,8 @@
   "author": "Job Heersink",
   "license": "ISC",
   "dependencies": {
+    "@jest/globals": "^29.7.0",
+    "@types/jest": "^29.5.12",
     "async": "^3.2.5",
     "cors": "^2.8.5",
     "express": "^4.19.2",
@@ -23,6 +25,7 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "transform": {},
     "coveragePathIgnorePatterns": [
       "/node_modules/"
     ]

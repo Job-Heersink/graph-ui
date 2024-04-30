@@ -23,13 +23,17 @@ Infrastructure:
 Backend:
 - Node.js
 - Express.js
+  - Used to build the REST API
 - Gremlin
+  - Used to interface with the neptune database
 
 Frontend:
 - Vue.js
+  - Although not required, Vue.js was used for the foundation of the frontend to facilitate maintainability and extendability.
 - d3.js
-- HTML5
+  - Used to display the graph data.
 - CSS
+  - Used for styling
 
 ## Deploying the system
 **This repository is equipped with CI/CD (via github actions). Any changes to this repository will be automatically deployed to the cloud.**

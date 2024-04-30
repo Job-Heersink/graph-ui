@@ -6,31 +6,7 @@ on:
       - main
 
 jobs:
-#  test:
-#    name: Execute Pytest on each branch
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#      - name: Checkout code
-#        uses: actions/checkout@v3
-#
-#      - name: Set up Python
-#        uses: actions/setup-python@v4
-#        with:
-#          python-version: '3.9'
-#          cache: 'pip'
-#
-#      - name: Install dependencies
-#        run: |
-#          pip install --upgrade pip
-#          pip install -r requirements.txt
-#          pip install pytest pytest-xdist pytest-asyncio
-#
-#      - name: Run Pytest
-#        run: pytest
-
   deploy:
-#    needs: test
     name: Deploy using CloudFormation
     runs-on: ubuntu-latest
     environment: dev

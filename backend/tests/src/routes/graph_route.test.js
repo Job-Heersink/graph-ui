@@ -1,9 +1,11 @@
-import {app} from '../../src/app.js';
-import supertest from 'supertest';
-import {describe, it} from "node:test";
-const requestWithSupertest = supertest(app);
+import { jest } from '@jest/globals';
+import {TreeNode} from "../../../src/models/tree_node.js";
+import request from "supertest";
+import {app} from "../../../src/app.js";
 
-const data = {
+jest.mock('../../../src/db/neptune.js');
+
+const mock_data = {
     "data":[
         {
             "name":"A",
@@ -43,14 +45,31 @@ const data = {
     ]
 }
 
-describe('Graph endpoints', () => {
+const traversal_mock = {toList: ()=>mock_data}
+traversal_mock.V = ()=>traversal_mock
+traversal_mock.project = ()=>traversal_mock
+traversal_mock.by = ()=>traversal_mock
 
-    it('GET /graph should get all graph data', async () => {
-        const res = await requestWithSupertest.get('/api/graph');
-        console.log(res.body)
-        // expect(res.status).toEqual(200);
-        // expect(res.type).toEqual(expect.stringContaining('json'));
-        // expect(res.body).toHaveProperty('users')
+
+
+describe('test graph controller', () => {
+
+
+    afterEach(() => {
+        jest.clearAllMocks();
     });
+
+
+    it('should send a JSON response with the nodes', async () => {
+        import("../../../src/db/neptune.js").then(async (mod)=>{
+            mod.get_traversal.mockReturnValue(()=>traversal_mock)
+            console.log(mod.get_traversal().toList())
+            const response = await request(app).get("/api/graph")
+            expect(response).toBe(mock_data.map(e => new TreeNode(e)))
+
+        })
+
+    });
+
 
 });
