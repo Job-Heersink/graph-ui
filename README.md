@@ -32,6 +32,8 @@ Frontend:
 - CSS
 
 ## Deploying the system
+**This repository is equipped with CI/CD (via github actions). Any changes to this repository will be automatically deployed to the cloud.**
+
 To deploy the system to your AWS account, make sure you have both [docker](https://docs.docker.com/engine/install/) and the [aws cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed.
 Make sure the aws cli is properly configured for your AWS account.
 
