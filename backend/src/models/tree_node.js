@@ -3,7 +3,7 @@ export class TreeNode {
     this.id = node.name;
     this.description = node.description;
     if(typeof node.parent !== 'undefined'){
-      this.parentId = node.parent
+      this.parentId = node.parent;
     }
   }
 }

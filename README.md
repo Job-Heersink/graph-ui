@@ -59,7 +59,7 @@ ssh -i "~/.ssh/neptune_proxy.pem" -L 8182:{Neptune hostname}:8182 ec2-user@{EC2 
 Once completed, you can start the backend as follows:
 - `cd backend`
 - `npm i`
-- `node index.js`
+- `node app.js`
 
 and run the frontend with:
 - `cd ui`

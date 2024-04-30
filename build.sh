@@ -7,6 +7,8 @@ ENVIRONMENT_CODE="dev"
 PRODUCT_NAME="graph-ui"
 #AWS_ECR_REPO="375681122944.dkr.ecr.eu-central-1.amazonaws.com"
 IMAGE_URI=$AWS_ECR_REPO/$PRODUCT_NAME:latest
+export FRONTEND_STACK="$ENVIRONMENT_CODE-$PRODUCT_NAME-frontend-stack"
+export BACKEND_STACK="$ENVIRONMENT_CODE-$PRODUCT_NAME-backend-stack"
 
 # create docker image
 aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_ECR_REPO
@@ -38,8 +40,6 @@ function deploy_stack() {
   return 0
 }
 
-export FRONTEND_STACK="$ENVIRONMENT_CODE-$PRODUCT_NAME-frontend-stack"
-export BACKEND_STACK="$ENVIRONMENT_CODE-$PRODUCT_NAME-backend-stack"
 deploy_stack "VPC-stack" "cloudformation/vpc_stack.yaml"
 deploy_stack $FRONTEND_STACK "cloudformation/frontend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE"
 deploy_stack $BACKEND_STACK "cloudformation/backend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE ParameterKey=VPCStackName,ParameterValue=VPC-stack ParameterKey=BackendImage,ParameterValue=$IMAGE_URI"

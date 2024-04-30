@@ -2,7 +2,7 @@
 populate the AWS Neptune Database with the given json data.
  */
 
-import {close_connection, get_traversal} from "./db/neptune.js"
+import {close_connection, get_traversal} from "./src/db/neptune.js"
 
 const data = {
     "data":[

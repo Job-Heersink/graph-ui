@@ -1,4 +1,4 @@
-import {app} from '../../index.js';
+import {app} from '../../src/app.js';
 import supertest from 'supertest';
 import {describe, it} from "node:test";
 const requestWithSupertest = supertest(app);
