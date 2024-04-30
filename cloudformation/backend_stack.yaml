@@ -39,29 +39,29 @@ Resources:
         - Name: containerInsights
           Value: enabled
 
-#  BackendECSService:
-#    Type: AWS::ECS::Service
-#    DependsOn:
-#      - BackendALBListener
-#    Properties:
-#      Cluster: !Ref BackendECSCluster
-#      DesiredCount: 1
-#      LaunchType: FARGATE
-#      NetworkConfiguration:
-#        AwsvpcConfiguration:
-#          AssignPublicIp: ENABLED
-#          SecurityGroups:
-#            - !Ref BackendSecurityGroup
-#          Subnets:
-#            - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetC"
-#      ServiceName:
-#        Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-service"
-#      TaskDefinition: !GetAtt BackendECSTask.TaskDefinitionArn
-#      LoadBalancers:
-#        - ContainerName:
-#            Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
-#          ContainerPort: !Ref BackendPort
-#          TargetGroupArn: !Ref BackendALBDefaultTargetGroup
+  BackendECSService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - BackendALBListener
+    Properties:
+      Cluster: !Ref BackendECSCluster
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref BackendSecurityGroup
+          Subnets:
+            - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnetC"
+      ServiceName:
+        Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-service"
+      TaskDefinition: !GetAtt BackendECSTask.TaskDefinitionArn
+      LoadBalancers:
+        - ContainerName:
+            Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
+          ContainerPort: !Ref BackendPort
+          TargetGroupArn: !Ref BackendALBDefaultTargetGroup
 
   BackendECSTask:
     Type: AWS::ECS::TaskDefinition
@@ -71,8 +71,14 @@ Resources:
 #          HealthCheck:
 #            Command: [ "CMD-SHELL", "curl -f http://localhost:5000/ping || exit 1" ] #TODO: fix
           Image: !Ref BackendImage
-#          LogConfiguration:
-#            LogConfiguration
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-group: !Ref backendLogGroup
+              awslogs-stream-prefix: "graph-ui"
+              mode: "non-blocking"
+              max-buffer-size: 10m
           Name:
             Fn::Sub: "ecs-${AWS::Region}-${EnvironmentCode}-graph-ui-backend-task"
           PortMappings:
@@ -96,6 +102,14 @@ Resources:
         CpuArchitecture: X86_64
         OperatingSystemFamily: LINUX
       TaskRoleArn: !GetAtt ECSTaskIAMRole.Arn
+
+  backendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupClass: "STANDARD"
+      LogGroupName:
+        Fn::Sub: "logs-${AWS::Region}-${EnvironmentCode}-graph-ui-logs"
+      RetentionInDays: 14
 
   BackendALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -135,6 +149,34 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref BackendALBDefaultTargetGroup
 
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - BackendALBListener
+    Properties:
+      DistributionConfig:
+        Comment:
+          Fn::Sub: "CloudFront distribution for graph-ui backend"
+        Origins:
+          - DomainName: !GetAtt BackendALB.DNSName
+            Id: dynamic-hosting
+            CustomOriginConfig:
+              HTTPPort: 5000
+              OriginProtocolPolicy: http-only
+        Enabled: "true"
+        HttpVersion: http2
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          TargetOriginId: dynamic-hosting
+          ForwardedValues:
+            QueryString: "false"
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+
   ECSTaskExecutionIAMRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -167,7 +209,7 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       Policies:
-        - PolicyName: 'root'
+        - PolicyName: 'db-access'
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -219,7 +261,7 @@ Resources:
       DBSubnetGroupName: !Ref NeptuneDBSubnetGroup
       DeletionProtection: false
       EngineVersion: "1.3"
-      IamAuthEnabled: true
+      IamAuthEnabled: false
 #      KmsKeyId: String
       StorageEncrypted: true
       VpcSecurityGroupIds:
@@ -278,3 +320,15 @@ Outputs:
     Value: !GetAtt BackendALB.DNSName
     Export:
       Name: !Sub ${AWS::StackName}-ALBEndpoint
+
+  ECSClusterName:
+    Description: Reference to the ecs cluster name
+    Value: !Ref BackendECSCluster
+    Export:
+      Name: !Sub ${AWS::StackName}-ECSClusterName
+
+  ECSServiceName:
+    Description: Reference to the ecs service name
+    Value: !GetAtt BackendECSService.Name
+    Export:
+      Name: !Sub ${AWS::StackName}-ECSServiceName

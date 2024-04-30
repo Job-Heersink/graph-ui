@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-export AWS_PROFILE=job-sandbox
+#export AWS_PROFILE=job-sandbox
 
 ENVIRONMENT_CODE="dev"
 PRODUCT_NAME="graph-ui"
-AWS_ECR_REPO="375681122944.dkr.ecr.eu-central-1.amazonaws.com"
+#AWS_ECR_REPO="375681122944.dkr.ecr.eu-central-1.amazonaws.com"
 IMAGE_URI=$AWS_ECR_REPO/$PRODUCT_NAME:latest
 
 # create docker image
@@ -43,6 +43,11 @@ export BACKEND_STACK="$ENVIRONMENT_CODE-$PRODUCT_NAME-backend-stack"
 deploy_stack "VPC-stack" "cloudformation/vpc_stack.yaml"
 deploy_stack $FRONTEND_STACK "cloudformation/frontend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE"
 deploy_stack $BACKEND_STACK "cloudformation/backend_stack.yaml" "ParameterKey=EnvironmentCode,ParameterValue=$ENVIRONMENT_CODE ParameterKey=VPCStackName,ParameterValue=VPC-stack ParameterKey=BackendImage,ParameterValue=$IMAGE_URI"
+
+#deploy backend
+CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`ECSClusterName`].OutputValue' --output text)
+SERVICE_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK --query 'Stacks[0].Outputs[?OutputKey==`ECSServiceName`].OutputValue' --output text)
+aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment
 
 # build frontend
 cd ui

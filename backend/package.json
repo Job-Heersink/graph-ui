@@ -13,8 +13,7 @@
     "async": "^3.2.5",
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "gremlin": "^3.7.2",
-    "gremlin-aws-sigv4": "^3.6.1"
+    "gremlin": "^3.7.2"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
