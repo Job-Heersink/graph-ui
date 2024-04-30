@@ -30,7 +30,7 @@ jobs:
 #        run: pytest
 
   deploy:
-    needs: test
+#    needs: test
     name: Deploy using CloudFormation
     runs-on: ubuntu-latest
     environment: dev
