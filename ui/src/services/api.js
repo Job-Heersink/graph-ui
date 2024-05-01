@@ -1,4 +1,4 @@
-const api_url = process.env.VUE_APP_API_URL || "http://localhost:5000"
+const api_url = "https://d35wqxpd6lbf36.cloudfront.net"
 
 export default async function fetch_data() {
     try {
